@@ -7,46 +7,46 @@ import (
 	"github.com/tyler569/aoc-2019/intcode/bits"
 )
 
-func executeProgram(program intcode.Program, input <-chan int, output chan<- int) {
+func executeProgram(program bits.Program, input <-chan int, output chan<- int) {
 	var index int
 	interp: for {
 		did_jump := false
-		in, consumed := intcode.ScanInstruction(program[index:])
+		in, consumed := bits.ScanInstruction(program[index:])
 		switch in.Opcode {
-		case intcode.OP_ADD, intcode.OP_MULTIPLY:
+		case bits.OP_ADD, bits.OP_MULTIPLY:
 			v1 := in.Args[0].Value(program)
 			v2 := in.Args[1].Value(program)
 			var out int
 
-			if in.Opcode == intcode.OP_ADD {
+			if in.Opcode == bits.OP_ADD {
 				out = v1 + v2
-			} else if in.Opcode == intcode.OP_MULTIPLY {
+			} else if in.Opcode == bits.OP_MULTIPLY {
 				out = v1 * v2
 			}
 
 			*(in.Args[2].PValue(program)) = out
-		case intcode.OP_OUTPUT:
+		case bits.OP_OUTPUT:
 			v := in.Args[0].Value(program)
 			output <- v
-		case intcode.OP_INPUT:
+		case bits.OP_INPUT:
 			v := <-input
 			ptr := in.Args[0].PValue(program)
 			*ptr = v
-		case intcode.OP_HALT:
+		case bits.OP_HALT:
 			close(output)
 			break interp
-		case intcode.OP_JUMP_T, intcode.OP_JUMP_F:
+		case bits.OP_JUMP_T, bits.OP_JUMP_F:
 			v := in.Args[0].Value(program)
 			target := in.Args[1].Value(program)
-			if (in.Opcode == intcode.OP_JUMP_T && v != 0) || (in.Opcode == intcode.OP_JUMP_F && v == 0) {
+			if (in.Opcode == bits.OP_JUMP_T && v != 0) || (in.Opcode == bits.OP_JUMP_F && v == 0) {
 				index = target
 				did_jump = true
 			}
-		case intcode.OP_LESS, intcode.OP_EQUALS:
+		case bits.OP_LESS, bits.OP_EQUALS:
 			c1 := in.Args[0].Value(program)
 			c2 := in.Args[1].Value(program)
 			p := in.Args[2].PValue(program)
-			if (in.Opcode == intcode.OP_LESS && c1 < c2) || (in.Opcode == intcode.OP_EQUALS && c1 == c2) {
+			if (in.Opcode == bits.OP_LESS && c1 < c2) || (in.Opcode == bits.OP_EQUALS && c1 == c2) {
 				*p = 1
 			} else {
 				*p = 0
@@ -63,12 +63,12 @@ func executeProgram(program intcode.Program, input <-chan int, output chan<- int
 }
 
 func main() {
-	program := intcode.ReadProgram("input")
+	program := bits.ReadProgram("input")
 
 	// fmt.Println(program)
 
 	/*
-	instrs := intcode.ScanInstructions(program)
+	instrs := bits.ScanInstructions(program)
 	for _, v := range instrs {
 		fmt.Println(v)
 	}

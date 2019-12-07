@@ -1,5 +1,5 @@
 
-package intcode
+package bits
 
 import (
 	"bufio"
