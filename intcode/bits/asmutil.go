@@ -1,4 +1,3 @@
-
 package bits
 
 import (
@@ -194,4 +193,3 @@ func (a Arg) PValue(p Program) *int {
 	}
 	panic("invalid pointer value")
 }
-
