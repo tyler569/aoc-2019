@@ -1,4 +1,5 @@
-package main
+
+package intcode
 
 import (
 	"bufio"
@@ -38,7 +39,7 @@ func scanCommas(data []byte, atEOF bool) (advance int, token []byte, err error) 
 	return 0, data, bufio.ErrFinalToken
 }
 
-func readProgram(filename string) Program {
+func ReadProgram(filename string) Program {
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
@@ -106,24 +107,24 @@ func (o Op) String() string {
 }
 
 type Arg struct {
-	v    int
-	mode Mode
+	V    int
+	Mode Mode
 }
 
 func (a Arg) String() string {
-	return fmt.Sprintf("(%v %v)", a.mode, a.v)
+	return fmt.Sprintf("(%v %v)", a.Mode, a.V)
 }
 
 type Instruction struct {
-	opcode Op
-	args   []Arg
+	Opcode Op
+	Args   []Arg
 }
 
 func (i Instruction) String() string {
-	if len(i.args) > 0 {
-		return fmt.Sprintf("%v %v", i.opcode, i.args)
+	if len(i.Args) > 0 {
+		return fmt.Sprintf("%v %v", i.Opcode, i.Args)
 	} else {
-		return fmt.Sprintf("%v", i.opcode)
+		return fmt.Sprintf("%v", i.Opcode)
 	}
 }
 
@@ -148,7 +149,7 @@ var opArgCount map[Op]int = map[Op]int{
 	OP_EQUALS:   3,
 }
 
-func scanInstruction(program []int) (i Instruction, consume int) {
+func ScanInstruction(program []int) (i Instruction, consume int) {
 	op, m := opDecode(program[0])
 
 	arg_count, ok := opArgCount[op]
@@ -165,12 +166,12 @@ func scanInstruction(program []int) (i Instruction, consume int) {
 	return Instruction{op, args}, arg_count + 1
 }
 
-func scanInstructions(program []int) []Instruction {
+func ScanInstructions(program []int) []Instruction {
 	var code []Instruction
 	var index int
 
 	for index < len(program) {
-		i, consume := scanInstruction(program[index:])
+		i, consume := ScanInstruction(program[index:])
 		code = append(code, i)
 		index += consume
 	}
@@ -179,89 +180,18 @@ func scanInstructions(program []int) []Instruction {
 }
 
 func (a Arg) Value(p Program) int {
-	if a.mode == MODE_IMMEDIATE {
-		return a.v
-	} else if a.mode == MODE_POSITION {
-		return p[a.v]
+	if a.Mode == MODE_IMMEDIATE {
+		return a.V
+	} else if a.Mode == MODE_POSITION {
+		return p[a.V]
 	}
 	panic("invalid argument mode")
 }
 
 func (a Arg) PValue(p Program) *int {
-	if a.mode == MODE_POSITION {
-		return &p[a.v]
+	if a.Mode == MODE_POSITION {
+		return &p[a.V]
 	}
 	panic("invalid pointer value")
 }
 
-func executeProgram(program Program) {
-	// code := scanInstructions(p)
-
-	var index int
-	interp: for {
-		did_jump := false
-		in, consumed := scanInstruction(program[index:])
-		switch in.opcode {
-		case OP_ADD, OP_MULTIPLY:
-			v1 := in.args[0].Value(program)
-			v2 := in.args[1].Value(program)
-			var out int
-
-			if in.opcode == OP_ADD {
-				out = v1 + v2
-			} else if in.opcode == OP_MULTIPLY {
-				out = v1 * v2
-			}
-
-			*(in.args[2].PValue(program)) = out
-		case OP_OUTPUT:
-			v := in.args[0].Value(program)
-			fmt.Println("output:", v)
-		case OP_INPUT:
-			var v int
-			fmt.Print("input: ")
-			_, err := fmt.Scanf("%d", &v)
-			if err != nil { panic(err) }
-
-			ptr := in.args[0].PValue(program)
-			*ptr = v
-		case OP_HALT:
-			break interp
-		case OP_JUMP_T, OP_JUMP_F:
-			v := in.args[0].Value(program)
-			target := in.args[1].Value(program)
-			if (in.opcode == OP_JUMP_T && v != 0) || (in.opcode == OP_JUMP_F && v == 0) {
-				index = target
-				did_jump = true
-			}
-		case OP_LESS, OP_EQUALS:
-			c1 := in.args[0].Value(program)
-			c2 := in.args[1].Value(program)
-			p := in.args[2].PValue(program)
-			if (in.opcode == OP_LESS && c1 < c2) || (in.opcode == OP_EQUALS && c1 == c2) {
-				*p = 1
-			} else {
-				*p = 0
-			}
-		default:
-			fmt.Printf("Invalid opcode: %d at index %d\n", program[index], index)
-			panic("cannot continue")
-		}
-
-		if !did_jump {
-			index += consumed
-		}
-	}
-}
-
-func main() {
-	program := readProgram("input")
-
-	// fmt.Println(program)
-
-	instrs := scanInstructions(program)
-	for _, v := range instrs {
-		fmt.Println(v)
-	}
-	executeProgram(program)
-}
