@@ -223,6 +223,7 @@ func executeProgram(program Program, input <-chan int, output chan<- int) {
 			ptr := in.args[0].PValue(program)
 			*ptr = v
 		case OP_HALT:
+			close(output)
 			break interp
 		case OP_JUMP_T, OP_JUMP_F:
 			v := in.args[0].Value(program)
@@ -251,23 +252,6 @@ func executeProgram(program Program, input <-chan int, output chan<- int) {
 	}
 }
 
-func scanfInput(c chan<- int) {
-	for {
-		var v int
-		fmt.Printf("input: ")
-		_, err := fmt.Scanf("%d", &v)
-		if err != nil { panic(err) }
-		c <- v
-	}
-}
-
-func printOutput(c <-chan int) {
-	for {
-		x := <-c
-		fmt.Println("output:", x)
-	}
-}
-
 func main() {
 	program := readProgram("input")
 
@@ -280,12 +264,23 @@ func main() {
 	input := make(chan int)
 	output := make(chan int)
 
-	go scanfInput(input)
-	go printOutput(output)
 	go executeProgram(program, input, output)
+
+	var inp int
+	fmt.Print("input: ")
+	fmt.Scanf("%d", &inp)
+	input <- inp
+	close(input)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+
+	go func() {
+		for x := range output {
+			fmt.Println("output:", x)
+		}
+		wg.Done()
+	}()
 	wg.Wait()
 }
 
