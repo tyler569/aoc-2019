@@ -255,7 +255,7 @@ func executeProgram(program Program) Program {
 }
 
 func main() {
-	program := readProgram("input2")
+	program := readProgram("input")
 
 	// fmt.Println(program)
 
