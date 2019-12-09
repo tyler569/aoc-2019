@@ -1,10 +1,11 @@
-package bits
+package main
 
 import (
 	"bufio"
 	"fmt"
+	"math/big"
 	"os"
-	"strconv"
+	// "strconv"
 	"strings"
 )
 
@@ -24,8 +25,6 @@ func max(a, b int) int {
 	}
 }
 
-type Program []int
-
 func scanCommas(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	for i := 0; i < len(data); i += 1 {
 		if data[i] == ',' {
@@ -38,7 +37,7 @@ func scanCommas(data []byte, atEOF bool) (advance int, token []byte, err error) 
 	return 0, data, bufio.ErrFinalToken
 }
 
-func ReadProgram(filename string) Program {
+func ReadProgram(filename string) []big.Int {
 	f, err := os.Open(filename)
 	if err != nil {
 		panic(err)
@@ -47,14 +46,11 @@ func ReadProgram(filename string) Program {
 	b := bufio.NewScanner(f)
 	b.Split(scanCommas)
 
-	program := make(Program, 0, 100)
+	program := make([]big.Int, 0, 100)
 
 	for b.Scan() {
 		num := strings.TrimSpace(b.Text())
-		val, err := strconv.Atoi(num)
-		if err != nil {
-			panic(err)
-		}
+		val := ics(num)
 		program = append(program, val)
 	}
 	return program
@@ -66,6 +62,7 @@ type Mode int
 const (
 	MODE_POSITION  Mode = 0
 	MODE_IMMEDIATE Mode = 1
+	MODE_RELATIVE  Mode = 2
 
 	PSOP_DATA   Op = 0
 	OP_ADD      Op = 1
@@ -76,12 +73,14 @@ const (
 	OP_JUMP_F   Op = 6
 	OP_LESS     Op = 7
 	OP_EQUALS   Op = 8
+	OP_SETBASE  Op = 9
 	OP_HALT     Op = 99
 )
 
 var modeStrings map[Mode]string = map[Mode]string{
 	MODE_POSITION:  "Position",
 	MODE_IMMEDIATE: "Immediate",
+	MODE_RELATIVE:  "Relative",
 }
 
 func (m Mode) String() string {
@@ -99,6 +98,7 @@ var opStrings map[Op]string = map[Op]string{
 	OP_JUMP_F:   "jumpf",
 	OP_LESS:     "less",
 	OP_EQUALS:   "greater",
+	OP_SETBASE:  "setbase",
 }
 
 func (o Op) String() string {
@@ -106,12 +106,12 @@ func (o Op) String() string {
 }
 
 type Arg struct {
-	V    int
+	V    big.Int
 	Mode Mode
 }
 
 func (a Arg) String() string {
-	return fmt.Sprintf("(%v %v)", a.Mode, a.V)
+	return fmt.Sprintf("(%v %v)", a.Mode, tos(&a.V))
 }
 
 type Instruction struct {
@@ -146,10 +146,12 @@ var opArgCount map[Op]int = map[Op]int{
 	OP_JUMP_F:   2,
 	OP_LESS:     3,
 	OP_EQUALS:   3,
+	OP_SETBASE:  1,
 }
 
-func ScanInstruction(program []int) (i Instruction, consume int) {
-	op, m := opDecode(program[0])
+func ScanInstruction(program []big.Int) (i Instruction, consume int) {
+	value := toi(&program[0])
+	op, m := opDecode(value)
 
 	arg_count, ok := opArgCount[op]
 	if !ok {
@@ -165,7 +167,7 @@ func ScanInstruction(program []int) (i Instruction, consume int) {
 	return Instruction{op, args}, arg_count + 1
 }
 
-func ScanInstructions(program []int) []Instruction {
+func ScanInstructions(program []big.Int) []Instruction {
 	var code []Instruction
 	var index int
 
@@ -178,18 +180,26 @@ func ScanInstructions(program []int) []Instruction {
 	return code
 }
 
-func (a Arg) Value(p Program) int {
+func (a Arg) Value(p IntcodeCPU) big.Int {
 	if a.Mode == MODE_IMMEDIATE {
 		return a.V
 	} else if a.Mode == MODE_POSITION {
-		return p[a.V]
+		offset := toi(&a.V)
+		return p.Memory[offset]
+	} else if a.Mode == MODE_RELATIVE {
+		offset := toi(&a.V)
+		return p.Memory[p.RelativeBase + offset]
 	}
 	panic("invalid argument mode")
 }
 
-func (a Arg) PValue(p Program) *int {
+func (a Arg) PValue(p IntcodeCPU) *big.Int {
 	if a.Mode == MODE_POSITION {
-		return &p[a.V]
+		offset := toi(&a.V)
+		return &p.Memory[offset]
+	} else if a.Mode == MODE_RELATIVE {
+		offset := toi(&a.V)
+		return &p.Memory[p.RelativeBase + offset]
 	}
 	panic("invalid pointer value")
 }
