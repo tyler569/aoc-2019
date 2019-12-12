@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"sync"
 )
 
@@ -71,8 +73,19 @@ interp:
 	}
 }
 
+func displayHelp() {
+	fmt.Println("intcode: an intcode CPU")
+	fmt.Println("  INPUT instructions are read from STDIN")
+	fmt.Println("  OUTPUT instructions are written to STDOUT")
+	fmt.Println(" --program FILE       The file with the program")
+}
+
 func main() {
-	program := ReadProgram("input")
+	var file = flag.String("program", "input", "program file")
+	flag.Parse()
+
+	fmt.Fprintln(os.Stderr, "Running intcode")
+	program := ReadProgram(*file)
 
 	// fmt.Println(program)
 
@@ -96,18 +109,20 @@ func main() {
 
 	go ExecuteProgram(cpu, input, output)
 
-	var inp int
-	fmt.Print("input: ")
-	fmt.Scanf("%d", &inp)
-	input <- inp
-	close(input)
+	go func() {
+		for {
+			var inp int
+			fmt.Scanf("%d", &inp)
+			input <- inp
+		}
+	}()
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
 		for x := range output {
-			fmt.Println("output:", x)
+			fmt.Println(x)
 		}
 		wg.Done()
 	}()
